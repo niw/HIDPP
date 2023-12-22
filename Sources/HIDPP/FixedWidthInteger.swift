@@ -16,4 +16,13 @@ extension FixedWidthInteger {
             return Data(bytes: baseAddress, count: bytes.count)
         }
     }
+
+    init?(data: Data, offset: Int){
+        guard data.count > offset + MemoryLayout<Self>.size else {
+            return nil
+        }
+        self = data.withUnsafeBytes { bytes in
+            bytes.loadUnaligned(fromByteOffset: offset, as: Self.self)
+        }
+    }
 }
