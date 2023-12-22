@@ -161,7 +161,7 @@ public final actor HIDPPDevice {
             data: identifier.bigEndian.data
         ))
         guard data.count > 2 else {
-            throw HIDPPError.invalidData
+            throw HIDPPError.invalidData(data)
         }
 
         let feature = Feature(index: data[0], version: data[2])

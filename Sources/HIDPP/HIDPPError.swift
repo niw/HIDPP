@@ -9,5 +9,5 @@ import Foundation
 
 public enum HIDPPError: Error {
     case unexpectedInputRequest
-    case invalidData
+    case invalidData(Data)
 }
