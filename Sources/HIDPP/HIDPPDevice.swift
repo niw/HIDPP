@@ -19,7 +19,7 @@ public final actor HIDPPDevice {
         ]
         return HIDManager.observeDevices(matching: matching, runLoop: runLoop, runLoopMode: runLoopMode).compactMap { (event: HIDManager.DeviceEvent) -> HIDPPDevice? in
             switch event {
-            case let .matching(device: device, error: error):
+            case .matching(device: let device, error: let error):
                 if error != nil {
                     return nil
                 } else {
@@ -56,32 +56,6 @@ public final actor HIDPPDevice {
         try await device.open()
     }
 
-    private func resumeLastRequestContinuationOnInputReport(payload: Data, error: (any Error)?) {
-        guard let lastRequestContinuation else {
-            return
-        }
-
-        let continuation = lastRequestContinuation.continuation
-
-        if let error = error {
-            continuation.resume(throwing: error)
-        } else {
-            let requestHeader = lastRequestContinuation.request.header
-
-            // Input request payload must have same header as request.
-            let headerSize = requestHeader.count
-            guard payload.count > headerSize,
-                  payload.subdata(in: 0..<headerSize) == requestHeader
-            else {
-                continuation.resume(throwing: HIDPPError.unexpectedInputRequest)
-                return
-            }
-
-            let data = payload.subdata(in: headerSize..<payload.count)
-            continuation.resume(returning: data)
-        }
-    }
-
     struct Request {
         var index: UInt8
         var featureIndex: UInt8
@@ -100,11 +74,15 @@ public final actor HIDPPDevice {
             self.data = data
         }
 
-        fileprivate var header: Data {
-            Data([index, featureIndex, functionIndex << 4])
+        private var header: Data {
+            Data([
+                index,
+                featureIndex,
+                functionIndex << 4
+            ])
         }
 
-        fileprivate var payload: Data {
+        var payload: Data {
             var payload = header
             let dataSize: Int
             if let data = data {
@@ -120,11 +98,81 @@ public final actor HIDPPDevice {
         }
     }
 
+    struct Response {
+        var index: UInt8
+        var featureIndex: UInt8
+        var functionIndex: UInt8
+        var data: Data
+
+        var isError: Bool
+
+        init(payload: Data) throws {
+            guard payload.count > 3 else {
+                throw HIDPPError.tooShortInputRequest
+            }
+
+            index = payload[0]
+            let headerSize: Int
+            if payload[1] == 0xff {
+                guard payload.count > 4 else {
+                    throw HIDPPError.tooShortInputRequest
+                }
+                isError = true
+                featureIndex = payload[2]
+                functionIndex = payload[3] >> 4
+                headerSize = 4
+            } else {
+                isError = false
+                featureIndex = payload[1]
+                functionIndex = payload[2] >> 4
+                headerSize = 3
+            }
+
+            data = payload.subdata(in: headerSize..<payload.count)
+        }
+
+        func isValid(for request: Request) -> Bool {
+            index == request.index
+            && featureIndex == request.featureIndex
+            && functionIndex == request.functionIndex
+        }
+    }
+
     private struct RequestContinuation {
         var request: Request
         var continuation: UnsafeContinuation<Data, any Error>
     }
     private var lastRequestContinuation: RequestContinuation?
+
+    private func resumeLastRequestContinuationOnInputReport(payload: Data, error: (any Error)?) {
+        guard let lastRequestContinuation else {
+            return
+        }
+
+        let continuation = lastRequestContinuation.continuation
+
+        if let error = error {
+            continuation.resume(throwing: error)
+        } else {
+            do {
+                let response = try Response(payload: payload)
+                let request = lastRequestContinuation.request
+
+                guard response.isValid(for: request) else {
+                    continuation.resume(throwing: HIDPPError.unexpectedInputRequest)
+                    return
+                }
+
+                if response.isError {
+                    continuation.resume(throwing: HIDPPError.errorInputRequest(data: response.data))
+                } else {
+                    continuation.resume(returning: response.data)
+                }
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
 
     func send(request: Request) async throws -> Data {
         try await withUnsafeThrowingContinuation { continuation in

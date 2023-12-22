@@ -8,6 +8,8 @@
 import Foundation
 
 public enum HIDPPError: Error {
+    case tooShortInputRequest
     case unexpectedInputRequest
+    case errorInputRequest(data: Data)
     case invalidData(Data)
 }
