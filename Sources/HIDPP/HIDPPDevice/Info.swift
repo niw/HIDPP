@@ -13,8 +13,8 @@ extension HIDPPDevice {
             let feature = try await feature(of: 0x0003)
             let data = try await send(request: Request(
                 featureIndex: feature.index,
-                functionIndex: 0x02)
-            )
+                functionIndex: 0x02
+            ))
             return String(cString: Array(data))
         }
     }

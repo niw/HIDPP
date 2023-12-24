@@ -28,7 +28,7 @@ struct Command: AsyncParsableCommand {
     }
 
     private struct SingleDeviceOptions: ParsableArguments {
-        @Option(name: [.short, .long], help: "Serial number")
+        @Option(name: [.short, .long])
         var serialNumber: String
 
         func run(_ block: (HIDPPDevice) async throws -> Encodable) async throws {
