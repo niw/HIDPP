@@ -8,8 +8,8 @@
 import Foundation
 
 extension HIDPPDevice {
-    public struct Battery: CustomDebugStringConvertible {
-        public enum Status: UInt8, CustomDebugStringConvertible {
+    public struct Battery: Codable {
+        public enum Status: UInt8, Codable {
             case discharging
             case charging
             case almostFull
@@ -18,56 +18,18 @@ extension HIDPPDevice {
             case invalidBattery
             case terminalError
             case otherError
-
-            public var debugDescription: String {
-                switch self {
-                case .discharging:
-                    "Discharging"
-                case .charging:
-                    "Charging"
-                case .almostFull:
-                    "Almost Full"
-                case .charged:
-                    "Charged"
-                case .slowRecharge:
-                    "Slow Recharge"
-                case .invalidBattery:
-                    "Invalid Battery"
-                case .terminalError:
-                    "Terminal Error"
-                case .otherError:
-                    "Other Error"
-                }
-            }
         }
 
-        public enum Level: UInt8, CustomDebugStringConvertible {
+        public enum Level: UInt8, Codable {
             case critical = 0x01 // 0x01 << 0
             case low = 0x02 // 0x01 << 1
             case good = 0x04 // 0x01 << 2
             case full = 0x08 // 0x01 << 3
-
-            public var debugDescription: String {
-                switch self {
-                case .critical:
-                    "Critical"
-                case .low:
-                    "Low"
-                case .good:
-                    "Good"
-                case .full:
-                    "Full"
-                }
-            }
         }
 
         public var percentage: UInt8
         public var level: Level?
         public var status: Status?
-
-        public var debugDescription: String {
-            "percentage: \(percentage)%, level: \(level?.debugDescription ?? "Unknown"), status: \(status?.debugDescription ?? "Unknown")"
-        }
     }
 
     public var battery: Battery {
