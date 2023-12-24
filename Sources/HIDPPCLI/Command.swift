@@ -21,8 +21,15 @@ struct Command: AsyncParsableCommand {
 
     private struct Enumerate: AsyncParsableCommand {
         func run() async throws {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+
             for try await device in HIDPPDevice.enumerateDevices(runLoop: .main, runLoopMode: .default) {
-                print(try await device.serialNumber)
+                let info = try await [
+                    "name": device.name,
+                    "serialNumber": device.serialNumber
+                ]
+                print(String(data: try encoder.encode(info), encoding: .utf8)!)
             }
         }
     }
