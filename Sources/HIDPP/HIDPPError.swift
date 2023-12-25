@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum HIDPPError: Error {
+public enum HIDPPError: Error, Sendable {
     case tooShortInputRequest
     case unexpectedInputRequest
     case errorInputRequest(data: Data)

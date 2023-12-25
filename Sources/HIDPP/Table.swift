@@ -7,11 +7,11 @@
 
 import Foundation
 
-struct Table<Key, Value> where Key: Hashable {
-    private var factory: (Key) -> Value
+struct Table<Key: Hashable & Sendable, Value: Sendable>: Sendable {
+    private var factory: @Sendable (Key) -> Value
     private var dictionary: [Key : Value] = [:]
 
-    init(_ factory: @escaping (Key) -> Value) {
+    init(_ factory: @escaping @Sendable (Key) -> Value) {
         self.factory = factory
     }
 

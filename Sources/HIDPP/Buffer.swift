@@ -7,7 +7,7 @@
 
 import Foundation
 
-class Buffer {
+final class Buffer: Sendable {
     let pointer: UnsafeMutableRawBufferPointer
 
     init(size: Int) {

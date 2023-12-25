@@ -7,7 +7,7 @@
 
 import Foundation
 
-class Box<Value> {
+final class Box<Value: Sendable>: Sendable {
     let value: Value
 
     init(_ value: Value) {

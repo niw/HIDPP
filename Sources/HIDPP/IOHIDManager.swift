@@ -9,6 +9,10 @@ import Foundation
 import IOKit
 import IOKit.hid
 
+// TODO: This is fine.
+extension IOHIDManager: @unchecked Sendable {
+}
+
 extension IOHIDManager {
     static func create(options: IOHIDManagerOptions = []) -> IOHIDManager {
         IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(options.rawValue))
@@ -32,7 +36,7 @@ extension IOHIDManager {
         IOHIDManagerClose(self, options)
     }
 
-    func setDeviceMatching(_ matching: [String: Any]) {
+    func setDeviceMatching(_ matching: [String : Any]) {
         IOHIDManagerSetDeviceMatching(self, matching as CFDictionary)
     }
 

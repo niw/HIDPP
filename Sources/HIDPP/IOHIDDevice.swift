@@ -9,6 +9,10 @@ import Foundation
 import IOKit
 import IOKit.hid
 
+// TODO: This is fine.
+extension IOHIDDevice: @unchecked Sendable {
+}
+
 extension IOHIDDevice {
     @discardableResult
     func open(options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)) -> IOReturn {

@@ -64,7 +64,7 @@ extension HIDPPDevice {
         }
     }
 
-    public enum DPIList {
+    public enum DPIList: Sendable {
         case values([UInt16])
         case stride(StrideTo<UInt16>)
     }

@@ -39,7 +39,7 @@ public final actor HIDManager {
     }
 
     public func start(
-        matching: [String: Any],
+        matching: [String : Sendable],
         runLoop: RunLoop,
         runLoopMode: RunLoop.Mode,
         options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)
@@ -75,7 +75,7 @@ public final actor HIDManager {
         hidDeviceTable.reset()
     }
 
-    public typealias DeviceHandler = (HIDDevice, (any Error)?) -> Void
+    public typealias DeviceHandler = @Sendable (HIDDevice, (any Error)?) -> Void
 
     private func callDeviceMatchingHandler(result: IOReturn, device: IOHIDDevice) {
         let hidDevice = hidDeviceTable.value(forKey: device)
@@ -144,7 +144,7 @@ public final actor HIDManager {
     }
 
     public static func observeDevices(
-        matching: [String: Any],
+        matching: [String : Sendable],
         runLoop: RunLoop,
         runLoopMode: RunLoop.Mode,
         options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)

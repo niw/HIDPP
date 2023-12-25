@@ -33,7 +33,7 @@ public final actor HIDDevice {
         }
     }
 
-    public typealias Handler = ((any Error)?) -> Void
+    public typealias Handler = @Sendable ((any Error)?) -> Void
 
     private func callRemovalHandler(result: IOReturn) {
         removalHandler?(result.error)
@@ -76,7 +76,7 @@ public final actor HIDDevice {
         return Buffer(size: inputReportBufferSize)
     }()
 
-    public typealias InputReportHandler = (Int, Data, (any Error)?) -> Void
+    public typealias InputReportHandler = @Sendable (Int, Data, (any Error)?) -> Void
 
     private func callInputReportHandler(
         result: IOReturn,

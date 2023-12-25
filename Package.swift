@@ -30,7 +30,12 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "HIDPP"
+            name: "HIDPP",
+            swiftSettings: [
+                // Use `-strict-concurrency=complete`.
+                // See <https://github.com/apple/swift/pull/66991>.
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         ),
         .executableTarget(
             name: "HIDPPCLI",
@@ -42,6 +47,11 @@ let package = Package(
                     name: "ArgumentParser",
                     package: "swift-argument-parser"
                 )
+            ],
+            swiftSettings: [
+                // Use `-strict-concurrency=complete`.
+                // See <https://github.com/apple/swift/pull/66991>.
+                .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
     ]
