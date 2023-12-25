@@ -49,14 +49,14 @@ public final actor HIDPPDevice {
                 guard let self else {
                     return
                 }
-                await self.resumeLastRequestContinuationOnInputReport(payload: data, error: error)
+                await self.resumeRequestContinuationOnInputReport(payload: data, error: error)
             }
         }
 
         try await device.open()
     }
 
-    struct Request {
+    struct Request: Equatable, Sendable {
         var index: UInt8
         var featureIndex: UInt8
         var functionIndex: UInt8
@@ -98,7 +98,7 @@ public final actor HIDPPDevice {
         }
     }
 
-    struct Response {
+    struct Response: Equatable, Sendable {
         var index: UInt8
         var featureIndex: UInt8
         var functionIndex: UInt8
@@ -138,25 +138,36 @@ public final actor HIDPPDevice {
         }
     }
 
-    private struct RequestContinuation {
-        var request: Request
-        var continuation: UnsafeContinuation<Data, any Error>
-    }
-    private var lastRequestContinuation: RequestContinuation?
+    // This is `class` to have a simple object equality withs its identify.
+    private final class RequestContinuation: Equatable, Sendable {
+        let request: Request
+        let continuation: UnsafeContinuation<Data, any Error>
 
-    private func resumeLastRequestContinuationOnInputReport(payload: Data, error: (any Error)?) {
-        guard let lastRequestContinuation else {
-            return
+        init(request: Request, continuation: UnsafeContinuation<Data, any Error>) {
+            self.request = request
+            self.continuation = continuation
         }
 
-        let continuation = lastRequestContinuation.continuation
+        static func == (lhs: HIDPPDevice.RequestContinuation, rhs: HIDPPDevice.RequestContinuation) -> Bool {
+            lhs === rhs
+        }
+    }
+
+    private var requestContinuations = Queue<RequestContinuation>()
+
+    private func resumeRequestContinuationOnInputReport(payload: Data, error: (any Error)?) {
+        guard let requestContinuation = requestContinuations.dequeue() else {
+            // Should not reach here.
+            return
+        }
+        let continuation = requestContinuation.continuation
 
         if let error = error {
             continuation.resume(throwing: error)
         } else {
             do {
                 let response = try Response(payload: payload)
-                let request = lastRequestContinuation.request
+                let request = requestContinuation.request
 
                 guard response.isValid(for: request) else {
                     continuation.resume(throwing: HIDPPError.unexpectedInputRequest)
@@ -177,7 +188,8 @@ public final actor HIDPPDevice {
     func send(request: Request) async throws -> Data {
         try await withUnsafeThrowingContinuation { continuation in
             Task {
-                lastRequestContinuation = RequestContinuation(request: request, continuation: continuation)
+                let requestContinuation = RequestContinuation(request: request, continuation: continuation)
+                requestContinuations.enqueue(requestContinuation)
                 do {
                     try await device.sendReport(
                         type: kIOHIDReportTypeOutput,
@@ -185,7 +197,8 @@ public final actor HIDPPDevice {
                         data: request.payload
                     )
                 } catch {
-                    lastRequestContinuation = nil
+                    // Reentrant
+                    requestContinuations.remove(requestContinuation)
                     continuation.resume(throwing: error)
                 }
             }
