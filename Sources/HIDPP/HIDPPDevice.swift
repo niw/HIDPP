@@ -56,6 +56,12 @@ public final actor HIDPPDevice {
         try await device.open()
     }
 
+    public var registryEntryID: UInt64 {
+        get async throws {
+            try await device.registryEntryID
+        }
+    }
+
     struct Request: Equatable, Sendable {
         var index: UInt8
         var featureIndex: UInt8

@@ -19,16 +19,28 @@ public final actor HIDDevice {
         _ = device.close(options: IOOptionBits(kIOHIDOptionsTypeNone))
     }
 
+    var registryEntryID: UInt64 {
+        get throws {
+            let service = IOHIDDeviceGetService(device)
+            var entryID = UInt64()
+            let result = IORegistryEntryGetRegistryEntryID(service, &entryID)
+            guard result == KERN_SUCCESS else {
+                throw HIDError.IOReturn(result)
+            }
+            return entryID
+        }
+    }
+
     public func open(options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)) throws {
         let result = device.open(options: options)
-        if result != kIOReturnSuccess {
+        guard result == kIOReturnSuccess else {
             throw HIDError.IOReturn(result)
         }
     }
 
     public func close(options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)) throws {
         let result = device.close(options: options)
-        if result != kIOReturnSuccess {
+        guard result == kIOReturnSuccess else {
             throw HIDError.IOReturn(result)
         }
     }
