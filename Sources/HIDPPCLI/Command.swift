@@ -98,9 +98,9 @@ struct Command: AsyncParsableCommand {
                 try await options.run { device in
                     switch try await device.DPIList(sensorIndex: sensor) {
                     case .values(let dpis):
-                        return dpis
+                        dpis
                     case .stride(let stride):
-                        return Array(stride)
+                        Array(stride)
                     }
                 }
             }

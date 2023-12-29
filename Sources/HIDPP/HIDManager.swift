@@ -10,13 +10,10 @@ import Foundation
 public final actor HIDManager {
     private let manager: IOHIDManager
 
-    private var hidDeviceTable: Table<IOHIDDevice, HIDDevice>
+    private var hidDevices = [IOHIDDevice : HIDDevice]()
 
     public init() {
         manager = IOHIDManager.create()
-        hidDeviceTable = Table { device in
-            HIDDevice(device: device)
-        }
     }
 
     deinit {
@@ -72,13 +69,15 @@ public final actor HIDManager {
         manager.unschedule(from: currentSchedule.runLoop, mode: currentSchedule.runLoopMode)
         self.currentSchedule = nil
 
-        hidDeviceTable.reset()
+        hidDevices.removeAll()
     }
 
     public typealias DeviceHandler = @Sendable (HIDDevice, (any Error)?) -> Void
 
     private func callDeviceMatchingHandler(result: IOReturn, device: IOHIDDevice) {
-        let hidDevice = hidDeviceTable.value(forKey: device)
+        let hidDevice = hidDevices.value(forKey: device) { device in
+            HIDDevice(device: device)
+        }
         deviceMatchingHandler?(hidDevice, result.error)
     }
 
@@ -108,9 +107,12 @@ public final actor HIDManager {
     }
 
     private func callDeviceRemovalHandler(result: IOReturn, device: IOHIDDevice) {
-        let hidDevice = hidDeviceTable.value(forKey: device)
-        deviceRemovalHandler?(hidDevice, result.error)
-        hidDeviceTable.removeValue(forKey: device)
+        if let hidDevice = hidDevices[device] {
+            deviceRemovalHandler?(hidDevice, result.error)
+            hidDevices.removeValue(forKey: device)
+        } else {
+            deviceRemovalHandler?(HIDDevice(device: device), result.error)
+        }
     }
 
     private var deviceRemovalHandler: DeviceHandler? {
