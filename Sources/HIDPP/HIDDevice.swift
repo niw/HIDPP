@@ -94,18 +94,17 @@ public final actor HIDDevice {
         result: IOReturn,
         type: IOHIDReportType,
         reportID: UInt32,
-        report: UnsafeMutablePointer<UInt8>,
-        reportLength: CFIndex
+        data: Data
     ) {
-        let data: Data
         // Skip `reportID` in report for non-zero reportID. This is required for macOS.
         // See <https://source.chromium.org/chromium/chromium/src/+/main:services/device/hid/hid_connection_mac.cc;l=163-168>.
-        if reportID == 0x00 || reportLength < 1 {
-            data = Data(bytes: report, count: reportLength)
+        let dataWithoutReportID: Data
+        if reportID == 0x00 || data.count < 1 {
+            dataWithoutReportID = data
         } else {
-            data = Data(bytes: report.advanced(by: 1), count: reportLength - 1)
+            dataWithoutReportID = data.advanced(by: 1)
         }
-        inputReportHandler?(Int(reportID), data, result.error)
+        inputReportHandler?(Int(reportID), dataWithoutReportID, result.error)
     }
 
     private var inputReportHandler: InputReportHandler? {
@@ -121,14 +120,15 @@ public final actor HIDDevice {
                     // Should not reach here.
                     return
                 }
+                // We need to copy `report` or it's gone in the Task.
+                let data = Data(bytes: report, count: reportLength)
                 let this = Unmanaged<HIDDevice>.fromOpaque(context).takeUnretainedValue()
                 Task {
                     await this.callInputReportHandler(
                         result: result,
                         type: type,
                         reportID: reportID,
-                        report: report,
-                        reportLength: reportLength
+                        data: data
                     )
                 }
             }, context: Unmanaged.passUnretained(self).toOpaque(), buffer: inputReportBuffer.pointer)
