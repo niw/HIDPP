@@ -35,7 +35,7 @@ extension HIDPPDevice {
     public var battery: Battery {
         get async throws {
             let feature = try await feature(of: 0x1004)
-            let data = try await send(request: Request(index: 0xff, featureIndex: feature.index, functionIndex: 0x01))
+            let data = try await sendRequest(index: 0xff, featureIndex: feature.index, functionIndex: 0x01)
             return Battery(
                 percentage: data[0],
                 level: Battery.Level(rawValue: data[1]),

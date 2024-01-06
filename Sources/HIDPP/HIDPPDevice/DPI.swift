@@ -11,18 +11,18 @@ extension HIDPPDevice {
     public var numberOfSensors: UInt8 {
         get async throws {
             let feature = try await feature(of: 0x2201)
-            let data = try await send(request: Request(featureIndex: feature.index))
+            let data = try await sendRequest(featureIndex: feature.index)
             return data[0]
         }
     }
 
     public func DPI(sensorIndex: UInt8 = 0) async throws -> UInt16 {
         let feature = try await feature(of: 0x2201)
-        let data = try await send(request: Request(
+        let data = try await sendRequest(
             featureIndex: feature.index,
             functionIndex: 0x02,
             data: sensorIndex.data
-        ))
+        )
         guard data[0] == sensorIndex else {
             throw HIDPPError.invalidData(data)
         }
@@ -37,11 +37,11 @@ extension HIDPPDevice {
         let feature = try await feature(of: 0x2201)
         var requestData = sensorIndex.data
         requestData.append(value.bigEndian.data)
-        let data = try await send(request: Request(
+        let data = try await sendRequest(
             featureIndex: feature.index,
             functionIndex: 0x03,
             data: requestData
-        ))
+        )
         guard data[0] == sensorIndex else {
             throw HIDPPError.invalidData(data)
         }
@@ -71,11 +71,11 @@ extension HIDPPDevice {
 
     public func DPIList(sensorIndex: UInt8 = 0) async throws -> DPIList {
         let feature = try await feature(of: 0x2201)
-        let data = try await send(request: Request(
+        let data = try await sendRequest(
             featureIndex: feature.index,
             functionIndex: 0x01,
             data: sensorIndex.data
-        ))
+        )
         guard data[0] == sensorIndex else {
             throw HIDPPError.invalidData(data)
         }

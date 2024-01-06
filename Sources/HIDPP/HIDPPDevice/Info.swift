@@ -11,10 +11,10 @@ extension HIDPPDevice {
     public var serialNumber: String {
         get async throws {
             let feature = try await feature(of: 0x0003)
-            let data = try await send(request: Request(
+            let data = try await sendRequest(
                 featureIndex: feature.index,
                 functionIndex: 0x02
-            ))
+            )
             return String(cString: Array(data))
         }
     }
@@ -22,18 +22,18 @@ extension HIDPPDevice {
     public var name: String {
         get async throws {
             let feature = try await feature(of: 0x0007)
-            let lengthData = try await send(request: Request(
+            let lengthData = try await sendRequest(
                 featureIndex: feature.index,
                 functionIndex: 0x00
-            ))
+            )
             let length = Int(lengthData[2])
             var data = Data(capacity: length)
             while data.count < length {
-                let partialData = try await send(request: Request(
+                let partialData = try await sendRequest(
                     featureIndex: feature.index,
                     functionIndex: 0x01,
                     data: UInt8(data.count).data
-                ))
+                )
                 let partialNameLength = min(length - data.count, partialData.count)
                 data.append(partialData.subdata(in: 1..<(1 + partialNameLength)))
             }

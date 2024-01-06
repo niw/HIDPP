@@ -49,7 +49,7 @@ public final actor HIDPPDevice {
                 guard let self else {
                     return
                 }
-                await self.resumeRequestContinuationOnInputReport(payload: data, error: error)
+                await self.handleInputReport(payload: data, error: error)
             }
         }
 
@@ -62,21 +62,33 @@ public final actor HIDPPDevice {
         }
     }
 
-    struct Request: Equatable, Sendable {
+    private struct Request: Equatable, Sendable {
+        var identifier: UInt8
+
         var index: UInt8
         var featureIndex: UInt8
         var functionIndex: UInt8
+
         var data: Data?
 
-        public init(
+        init(
+            identifier: UInt8,
             index: UInt8 = 0xff,
             featureIndex: UInt8,
             functionIndex: UInt8 = 0x00,
             data: Data? = nil
         ) {
+            // This `identifier`, so called `SwID` in some documentations, located at the lower
+            // 4 bits of the `functionIndex`, is used to identify the response for the request.
+            // The most significant bit of it is always set to identify the response from the
+            // notifications thus, we only can use remaining 3 bits to identify it.
+            // See `header` as well.
+            self.identifier = identifier & 0x07
+
             self.index = index
             self.featureIndex = featureIndex
             self.functionIndex = functionIndex
+
             self.data = data
         }
 
@@ -84,7 +96,9 @@ public final actor HIDPPDevice {
             Data([
                 index,
                 featureIndex,
-                functionIndex << 4
+                // Set the most significant of lower 4 bits of the `functionIndex` for the request
+                // to identify the response from the notifications.
+                (functionIndex << 4) | 0x08 | (identifier & 0x07)
             ])
         }
 
@@ -104,10 +118,21 @@ public final actor HIDPPDevice {
         }
     }
 
-    struct Response: Equatable, Sendable {
+    private var lastRequestIdentifier: UInt8 = 0
+
+    private func nextRequestIdentifier() -> UInt8 {
+        lastRequestIdentifier = (lastRequestIdentifier + 1) & 0x07
+        return lastRequestIdentifier
+    }
+
+    private struct Response: Equatable, Sendable {
+        var isNotification: Bool
+        var identifier: UInt8
+
         var index: UInt8
         var featureIndex: UInt8
         var functionIndex: UInt8
+
         var data: Data
 
         var isError: Bool
@@ -118,34 +143,43 @@ public final actor HIDPPDevice {
             }
 
             index = payload[0]
-            let headerSize: Int
+
+            let headerPosition: Int
             if payload[1] == 0xff {
                 guard payload.count > 4 else {
                     throw HIDPPError.tooShortInputRequest
                 }
                 isError = true
-                featureIndex = payload[2]
-                functionIndex = payload[3] >> 4
-                headerSize = 4
+                headerPosition = 1
             } else {
                 isError = false
-                featureIndex = payload[1]
-                functionIndex = payload[2] >> 4
-                headerSize = 3
+                headerPosition = 0
             }
 
+            featureIndex = payload[headerPosition + 1]
+
+            functionIndex = payload[headerPosition + 2] >> 4
+            // The lower 4 bits of `functionIndex` is for the identifier.
+            // The most significant bit of it is set on the response for the request.
+            // Otherwise, it is a notification.
+            isNotification = (payload[headerPosition + 2] & 0x08) == 0x00
+            identifier = payload[headerPosition + 2] & 0x07
+
+            let headerSize = headerPosition + 3
             data = payload.subdata(in: headerSize..<payload.count)
         }
 
         func isValid(for request: Request) -> Bool {
-            index == request.index
+            !isNotification
+            && identifier == request.identifier
+            && index == request.index
             && featureIndex == request.featureIndex
             && functionIndex == request.functionIndex
         }
     }
 
-    // This is `class` to have a simple object equality withs its identify.
-    private final class RequestContinuation: Equatable, Sendable {
+    // This is `class` to have a simple object equality with its identify.
+    private final class RequestContinuation: Equatable, Sendable, CustomStringConvertible {
         let request: Request
         let continuation: UnsafeContinuation<Data, any Error>
 
@@ -157,45 +191,76 @@ public final actor HIDPPDevice {
         static func == (lhs: HIDPPDevice.RequestContinuation, rhs: HIDPPDevice.RequestContinuation) -> Bool {
             lhs === rhs
         }
+
+        var description: String {
+            "RequestContinuation request: \(request)"
+        }
     }
 
-    private var requestContinuations = Queue<RequestContinuation>()
+    private var requestContinuations = [UInt8 : RequestContinuation]()
 
-    private func resumeRequestContinuationOnInputReport(payload: Data, error: (any Error)?) {
-        guard let requestContinuation = requestContinuations.dequeue() else {
-            // Should not reach here.
+    private func useRequestContinuation(for identifier: UInt8, _ block: (RequestContinuation) throws -> Void) rethrows {
+        guard let requestContinuation = requestContinuations[identifier] else {
             return
         }
-        let continuation = requestContinuation.continuation
+        try block(requestContinuation)
+        requestContinuations[identifier] = nil
+    }
 
-        if let error = error {
-            continuation.resume(throwing: error)
-        } else {
-            do {
-                let response = try Response(payload: payload)
-                let request = requestContinuation.request
+    private func setRequestContinuation(_ requestContinuation: RequestContinuation) {
+        requestContinuations[requestContinuation.request.identifier] = requestContinuation
+    }
 
-                guard response.isValid(for: request) else {
-                    continuation.resume(throwing: HIDPPError.unexpectedInputRequest)
-                    return
-                }
+    private func unsetRequestContinuation(_ requestContinuation: RequestContinuation) {
+        requestContinuations[requestContinuation.request.identifier] = nil
+    }
 
-                if response.isError {
-                    continuation.resume(throwing: HIDPPError.errorInputRequest(data: response.data))
-                } else {
-                    continuation.resume(returning: response.data)
-                }
-            } catch {
-                continuation.resume(throwing: error)
+    private func handleInputReport(payload: Data, error: (any Error)?) {
+        guard error == nil else {
+            return
+        }
+
+        guard let response = try? Response(payload: payload) else {
+            return
+        }
+
+        guard !response.isNotification else {
+            return
+        }
+
+        useRequestContinuation(for: response.identifier) { requestContinuation in
+            let continuation = requestContinuation.continuation
+            let request = requestContinuation.request
+
+            guard response.isValid(for: request) else {
+                continuation.resume(throwing: HIDPPError.unexpectedInputRequest)
+                return
+            }
+
+            if response.isError {
+                continuation.resume(throwing: HIDPPError.errorInputRequest(data: response.data))
+            } else {
+                continuation.resume(returning: response.data)
             }
         }
     }
 
-    func send(request: Request) async throws -> Data {
+    func sendRequest(
+        index: UInt8 = 0xff,
+        featureIndex: UInt8,
+        functionIndex: UInt8 = 0x00,
+        data: Data? = nil
+    ) async throws -> Data {
         try await withUnsafeThrowingContinuation { continuation in
             Task {
+                let request = Request(
+                    identifier: nextRequestIdentifier(),
+                    featureIndex: featureIndex,
+                    functionIndex: functionIndex,
+                    data: data
+                )
                 let requestContinuation = RequestContinuation(request: request, continuation: continuation)
-                requestContinuations.enqueue(requestContinuation)
+                setRequestContinuation(requestContinuation)
                 do {
                     try await device.sendReport(
                         type: kIOHIDReportTypeOutput,
@@ -204,14 +269,14 @@ public final actor HIDPPDevice {
                     )
                 } catch {
                     // Reentrant
-                    requestContinuations.remove(requestContinuation)
+                    unsetRequestContinuation(requestContinuation)
                     continuation.resume(throwing: error)
                 }
             }
         }
     }
 
-    struct Feature {
+    struct Feature: Equatable {
         var index: UInt8
         var version: UInt8
     }
@@ -223,10 +288,10 @@ public final actor HIDPPDevice {
             return feature
         }
 
-        let data = try await send(request: Request(
+        let data = try await sendRequest(
             featureIndex: 0x00,
             data: identifier.bigEndian.data
-        ))
+        )
         guard data.count > 2 else {
             throw HIDPPError.invalidData(data)
         }
