@@ -8,6 +8,8 @@
 import Foundation
 
 public enum HIDPPError: Error, Sendable {
+    case duplicatedRequestIdentifier
+    case timeout
     case tooShortInputRequest
     case unexpectedInputRequest
     case errorInputRequest(data: Data)

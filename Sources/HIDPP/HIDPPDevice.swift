@@ -197,22 +197,24 @@ public final actor HIDPPDevice {
         }
     }
 
-    private var requestContinuations = [UInt8 : RequestContinuation]()
+    // Do not access this variable directly, always use from other functions to maintain retained
+    // continuations state.
+    private var _requestContinuations = [UInt8 : RequestContinuation]()
 
-    private func useRequestContinuation(for identifier: UInt8, _ block: (RequestContinuation) throws -> Void) rethrows {
-        guard let requestContinuation = requestContinuations[identifier] else {
+    private func useRequestContinuation(for identifier: UInt8, _ block: @Sendable (RequestContinuation) throws -> Void) rethrows {
+        guard let requestContinuation = _requestContinuations[identifier] else {
             return
         }
         try block(requestContinuation)
-        requestContinuations[identifier] = nil
+        _requestContinuations[identifier] = nil
     }
 
-    private func setRequestContinuation(_ requestContinuation: RequestContinuation) {
-        requestContinuations[requestContinuation.request.identifier] = requestContinuation
-    }
-
-    private func unsetRequestContinuation(_ requestContinuation: RequestContinuation) {
-        requestContinuations[requestContinuation.request.identifier] = nil
+    private func setRequestContinuation(_ requestContinuation: RequestContinuation) throws {
+        let identifier = requestContinuation.request.identifier
+        guard _requestContinuations[identifier] == nil else {
+            throw HIDPPError.duplicatedRequestIdentifier
+        }
+        _requestContinuations[identifier] = requestContinuation
     }
 
     private func handleInputReport(payload: Data, error: (any Error)?) {
@@ -237,11 +239,12 @@ public final actor HIDPPDevice {
                 return
             }
 
-            if response.isError {
+            guard !response.isError else {
                 continuation.resume(throwing: HIDPPError.errorInputRequest(data: response.data))
-            } else {
-                continuation.resume(returning: response.data)
+                return
             }
+
+            continuation.resume(returning: response.data)
         }
     }
 
@@ -253,24 +256,49 @@ public final actor HIDPPDevice {
     ) async throws -> Data {
         try await withUnsafeThrowingContinuation { continuation in
             Task {
+                // Within actor isolation
+                let identifier = nextRequestIdentifier()
                 let request = Request(
-                    identifier: nextRequestIdentifier(),
+                    identifier: identifier,
                     featureIndex: featureIndex,
                     functionIndex: functionIndex,
                     data: data
                 )
+
                 let requestContinuation = RequestContinuation(request: request, continuation: continuation)
-                setRequestContinuation(requestContinuation)
+
+                do {
+                    try setRequestContinuation(requestContinuation)
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
                 do {
                     try await device.sendReport(
                         type: kIOHIDReportTypeOutput,
                         reportID: Self.reportID,
                         data: request.payload
                     )
+                    // Reentrant
+                    Task.detached {
+                        do {
+                            try await SuspendingClock().sleep(until: .now + .seconds(2))
+                            await self.useRequestContinuation(for: identifier) { requestContinuation in
+                                requestContinuation.continuation.resume(throwing: HIDPPError.timeout)
+                            }
+                        } catch {
+                            // Should not reach here.
+                            await self.useRequestContinuation(for: identifier) { requestContinuation in
+                                requestContinuation.continuation.resume(throwing: error)
+                            }
+                        }
+                    }
                 } catch {
                     // Reentrant
-                    unsetRequestContinuation(requestContinuation)
-                    continuation.resume(throwing: error)
+                    useRequestContinuation(for: identifier) { requestContinuation in
+                        requestContinuation.continuation.resume(throwing: error)
+                    }
                 }
             }
         }
