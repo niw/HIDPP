@@ -21,12 +21,12 @@ public final actor HIDManager {
             return
         }
         manager.close()
-        manager.unschedule(from: currentSchedule.runLoop, mode: currentSchedule.runLoopMode)
+        manager.unschedule(from: currentSchedule.runLoop, mode: currentSchedule.mode)
     }
 
     private struct Schedule {
         var runLoop: RunLoop
-        var runLoopMode: RunLoop.Mode
+        var mode: RunLoop.Mode
     }
 
     private var currentSchedule: Schedule?
@@ -37,8 +37,8 @@ public final actor HIDManager {
 
     public func start(
         matching: [String : Sendable],
-        runLoop: RunLoop,
-        runLoopMode: RunLoop.Mode,
+        on runLoop: RunLoop,
+        mode: RunLoop.Mode,
         options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)
     ) throws {
         guard currentSchedule == nil else {
@@ -46,14 +46,14 @@ public final actor HIDManager {
         }
 
         manager.setDeviceMatching(matching)
-        manager.schedule(with: runLoop, mode: runLoopMode)
+        manager.schedule(with: runLoop, mode: mode)
 
         let result = manager.open(options: options)
         guard result == kIOReturnSuccess else {
             throw HIDError.IOReturn(result)
         }
 
-        currentSchedule = Schedule(runLoop: runLoop, runLoopMode: runLoopMode)
+        currentSchedule = Schedule(runLoop: runLoop, mode: mode)
     }
 
     public func stop() throws {
@@ -66,7 +66,7 @@ public final actor HIDManager {
             throw HIDError.IOReturn(result)
         }
 
-        manager.unschedule(from: currentSchedule.runLoop, mode: currentSchedule.runLoopMode)
+        manager.unschedule(from: currentSchedule.runLoop, mode: currentSchedule.mode)
         self.currentSchedule = nil
 
         hidDevices.removeAll()
@@ -147,8 +147,8 @@ public final actor HIDManager {
 
     public static func observeDevices(
         matching: [String : Sendable],
-        runLoop: RunLoop,
-        runLoopMode: RunLoop.Mode,
+        on runLoop: RunLoop,
+        mode: RunLoop.Mode,
         options: IOOptionBits = IOOptionBits(kIOHIDOptionsTypeNone)
     ) -> AsyncThrowingStream<DeviceEvent, any Error> {
         AsyncThrowingStream { continuation in
@@ -173,8 +173,8 @@ public final actor HIDManager {
                 do {
                     try await manager.start(
                         matching: matching,
-                        runLoop: runLoop,
-                        runLoopMode: runLoopMode,
+                        on: runLoop,
+                        mode: mode,
                         options: options
                     )
                 } catch {

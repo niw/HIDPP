@@ -13,11 +13,11 @@ public final actor HIDPPDevice {
     // HIDPP 2.0
     static let reportID = 0x11
 
-    public static func enumerateDevices(runLoop: RunLoop, runLoopMode: RunLoop.Mode) -> AsyncThrowingStream<HIDPPDevice, any Error> {
+    public static func enumerateDevices(on runLoop: RunLoop, mode: RunLoop.Mode) -> AsyncThrowingStream<HIDPPDevice, any Error> {
         let matching = [
             kIOHIDVendorIDKey: vendorID
         ]
-        return HIDManager.observeDevices(matching: matching, runLoop: runLoop, runLoopMode: runLoopMode).compactMap { (event: HIDManager.DeviceEvent) -> HIDPPDevice? in
+        return HIDManager.observeDevices(matching: matching, on: runLoop, mode: mode).compactMap { (event: HIDManager.DeviceEvent) -> HIDPPDevice? in
             switch event {
             case .matching(device: let device, error: let error):
                 if error != nil {

@@ -24,7 +24,7 @@ struct Command: AsyncParsableCommand {
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
 
-            for try await device in HIDPPDevice.enumerateDevices(runLoop: .main, runLoopMode: .default) {
+            for try await device in HIDPPDevice.enumerateDevices(on: .main, mode: .default) {
                 let info = try await [
                     "name": device.name,
                     "serialNumber": device.serialNumber
@@ -39,7 +39,7 @@ struct Command: AsyncParsableCommand {
         var serialNumber: String
 
         func run(_ block: (HIDPPDevice) async throws -> Encodable) async throws {
-            for try await device in HIDPPDevice.enumerateDevices(runLoop: .main, runLoopMode: .default) {
+            for try await device in HIDPPDevice.enumerateDevices(on: .main, mode: .default) {
                 guard try await device.serialNumber == serialNumber else {
                     continue
                 }
