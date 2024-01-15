@@ -62,6 +62,10 @@ public final actor HIDPPDevice {
         }
     }
 
+    public func useRemovalHandler(_ handler: HIDDevice.Handler?) async {
+        await device.useRemovalHandler(handler)
+    }
+
     private struct Request: Equatable, Sendable {
         var identifier: UInt8
 
