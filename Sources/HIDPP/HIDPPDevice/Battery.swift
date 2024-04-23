@@ -8,8 +8,8 @@
 import Foundation
 
 extension HIDPPDevice {
-    public struct Battery: Codable, Sendable {
-        public enum Status: UInt8, Codable, Sendable {
+    public struct Battery: Codable, Equatable, Sendable {
+        public enum Status: UInt8, Codable, Equatable, Sendable {
             case discharging
             case charging
             case almostFull
@@ -20,7 +20,7 @@ extension HIDPPDevice {
             case otherError
         }
 
-        public enum Level: UInt8, Codable, Sendable {
+        public enum Level: UInt8, Codable, Equatable, Sendable {
             case critical = 0x01 // 0x01 << 0
             case low = 0x02 // 0x01 << 1
             case good = 0x04 // 0x01 << 2
