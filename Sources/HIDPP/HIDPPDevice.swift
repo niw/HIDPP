@@ -183,7 +183,7 @@ public final actor HIDPPDevice {
     }
 
     // This is `class` to have a simple object equality with its identify.
-    private final class RequestContinuation: Equatable, Sendable, CustomStringConvertible {
+    private final class RequestContinuation: Equatable, CustomStringConvertible, Sendable {
         let request: Request
         let continuation: UnsafeContinuation<Data, any Error>
 
