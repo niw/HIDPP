@@ -11,7 +11,7 @@ import HIDPP
 
 @main
 struct Command: AsyncParsableCommand {
-    static var configuration = CommandConfiguration(
+    static let configuration = CommandConfiguration(
         subcommands: [
             Enumerate.self,
             Battery.self,
@@ -67,7 +67,7 @@ struct Command: AsyncParsableCommand {
     }
 
     private struct DPI: AsyncParsableCommand {
-        static var configuration = CommandConfiguration(
+        static let configuration = CommandConfiguration(
             subcommands: [
                 SensorCount.self,
                 List.self,
