@@ -8,5 +8,5 @@
 import Foundation
 
 // TODO: This is fine.
-extension RunLoop: @unchecked Sendable {
+extension RunLoop: @retroactive @unchecked Sendable {
 }

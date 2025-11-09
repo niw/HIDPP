@@ -10,7 +10,7 @@ import IOKit
 import IOKit.hid
 
 // TODO: This is fine.
-extension IOHIDManager: @unchecked Sendable {
+extension IOHIDManager: @retroactive @unchecked Sendable {
 }
 
 extension IOHIDManager {
