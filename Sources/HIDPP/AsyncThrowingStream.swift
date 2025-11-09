@@ -32,21 +32,21 @@ SOFTWARE.
 */
 
 extension AsyncThrowingStream where Failure == Error {
-    init<S: AsyncSequence>(_ sequence: S) where S.Element == Element {
+    init<S: AsyncSequence>(_ sequence: S) where S: Sendable, S.Element == Element {
         let lock = NSLock()
-        var iterator: S.AsyncIterator?
+        let iterator = UncheckedBox<S.AsyncIterator?>(nil)
         self.init {
             lock.withLock {
-                if iterator == nil {
-                    iterator = sequence.makeAsyncIterator()
+                if iterator.value == nil {
+                    iterator.value = sequence.makeAsyncIterator()
                 }
             }
-            return try await iterator?.next()
+            return try await iterator.value?.next()
         }
     }
 }
 
-extension AsyncSequence {
+extension AsyncSequence where Self: Sendable {
     func eraseToThrowingStream() -> AsyncThrowingStream<Element, any Error> {
         AsyncThrowingStream(self)
     }

@@ -14,3 +14,11 @@ final class Box<Value: Sendable>: Sendable {
         self.value = value
     }
 }
+
+final class UncheckedBox<Value>: @unchecked Sendable {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+}
